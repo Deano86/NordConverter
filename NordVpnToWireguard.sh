@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-readonly VERSION="1.0.0"
+readonly VERSION="1.1.0"
 readonly PROGRAM_NAME="${0##*/}"
 readonly INTERFACE_NAME="nordlynx"
 readonly DEFAULT_DNS="103.86.96.100, 103.86.99.100"
@@ -32,6 +32,7 @@ Options:
   -v, --version    Show the version
 
 Direct destination arguments are passed to "nordvpn connect" unchanged.
+If no NordVPN session exists, an interactive login menu is displayed first.
 EOF
 }
 
@@ -42,6 +43,76 @@ die() {
 
 need_command() {
     command -v "$1" >/dev/null 2>&1 || die "Required command '$1' was not found."
+}
+
+is_logged_in() {
+    nordvpn account >/dev/null 2>&1
+}
+
+login_menu() {
+    local choice callback_url access_token
+
+    [[ -t 0 ]] || die "NordVPN is not logged in. Run '$PROGRAM_NAME' in an interactive terminal first."
+
+    while ! is_logged_in; do
+        cat <<'EOF'
+
+No active NordVPN login was found.
+
+  1) Log in using a browser on this computer
+  2) Paste a nordvpn:// callback link
+  3) Log in with an access token (headless/server)
+  4) Quit
+
+EOF
+        read -r -p 'Choose [1-4]: ' choice
+
+        case "$choice" in
+            1)
+                printf '\nOpening the NordVPN browser login...\n'
+                nordvpn login || true
+                printf '\nFinish signing in in the browser and select Continue.\n'
+                read -r -p 'Press Enter after completing the browser login...'
+                ;;
+            2)
+                printf '\nAfter signing in, right-click the final Continue button,\n'
+                printf 'choose Copy link address, then paste the nordvpn:// link below.\n'
+                callback_url=$(prompt_nonempty 'Callback link: ')
+                if [[ "$callback_url" != nordvpn://* ]]; then
+                    printf 'That does not look like a nordvpn:// callback link.\n' >&2
+                    continue
+                fi
+                if ! nordvpn login --callback "$callback_url"; then
+                    printf 'Callback login failed. Generate a fresh link and try again.\n' >&2
+                fi
+                unset callback_url
+                ;;
+            3)
+                printf '\nGenerate a token in Nord Account under:\n'
+                printf 'NordVPN -> Advanced settings -> Get access token.\n'
+                read -r -s -p 'Access token (input hidden): ' access_token
+                printf '\n'
+                if [[ -z "$access_token" ]]; then
+                    printf 'No token was entered.\n' >&2
+                elif ! nordvpn login --token "$access_token"; then
+                    printf 'Token login failed. Check the token and try again.\n' >&2
+                fi
+                unset access_token
+                ;;
+            4|q|Q)
+                printf 'Cancelled.\n'
+                exit 0
+                ;;
+            *) printf 'Please choose a number from 1 to 4.\n' >&2 ;;
+        esac
+    done
+
+    printf '\nNordVPN login confirmed.\n'
+}
+
+ensure_logged_in() {
+    is_logged_in && return
+    login_menu
 }
 
 cleanup() {
@@ -210,6 +281,8 @@ main() {
         interactive_destination
         confirm_destination
     fi
+
+    ensure_logged_in
     generate_config
 }
 
