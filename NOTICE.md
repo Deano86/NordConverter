@@ -1,40 +1,33 @@
-# Attribution notice
+# NordConverter notice
 
-The current NordConverter edition has been modified and is maintained by
-**Deano86**. This credit applies to the NordConverter modifications and does not
-claim authorship or ownership of the original NordVPN-Wireguard project.
+## Project credit
 
-NordConverter was originally based on **NordVPN-Wireguard**, created by Stefano
-Fiorini:
+NordConverter 2.0 was prepared for and is maintained by **Deano86**. It is a new
+implementation based on the project's functional requirements and the documented
+behaviour of the NordVPN Linux CLI and WireGuard command-line tools.
 
-https://github.com/sfiorini/NordVPN-Wireguard
+Version 2 replaces an earlier prototype that had been adapted from a third-party
+NordVPN-to-WireGuard utility. No third-party generator source code is
+intentionally included in this implementation. Similarities in commands,
+configuration field names, and required operational steps may remain because
+those elements are dictated by the external command-line interfaces and the
+WireGuard configuration format.
 
-The original project provided the core approach of temporarily connecting with
-the NordVPN Linux client, reading parameters from the active NordLynx interface,
-and writing those parameters as a WireGuard configuration.
+This statement documents the development approach; it is not a formal legal
+clean-room certification or legal opinion.
 
-NordConverter has since been substantially modified. Changes include:
+## Distribution status
 
-- an interactive destination menu;
-- automatic login-state detection;
-- browser, callback-link, and access-token login flows;
-- preserved and safely quoted command-line arguments;
-- dependency and input validation;
-- automatic cleanup following most errors;
-- restrictive permissions for generated configurations;
-- updated WireGuard configuration syntax; and
-- rewritten installation and usage documentation.
+No open-source licence is granted by this repository unless a separate `LICENSE`
+file is added. Before choosing a licence or distributing the project, the
+maintainer should obtain legal advice appropriate to the relevant jurisdiction.
 
-## Licensing status
+## Third-party names
 
-No license file was identified in the upstream repository when this notice was
-prepared on 22 July 2026. In the absence of a license, standard copyright rules
-may restrict copying, modification, and redistribution.
+NordVPN and NordLynx are names associated with Nord Security. NordConverter is
+unofficial and is not affiliated with, sponsored by, or endorsed by Nord
+Security.
 
-This notice provides attribution and documents the project's origin. It is not a
-license, does not grant rights to the upstream work, and does not replace any
-permission that may be required from the original author.
-
-NordVPN and NordLynx are names associated with Nord Security. WireGuard is a
-registered trademark of Jason A. Donenfeld. This project is unofficial and is
-not endorsed by or affiliated with Nord Security or the WireGuard project.
+"WireGuard" and the "WireGuard" logo are registered trademarks of Jason A.
+Donenfeld. NordConverter is not affiliated with, sponsored by, or endorsed by
+the WireGuard project. See https://www.wireguard.com/trademark-policy/.
