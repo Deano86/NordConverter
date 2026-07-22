@@ -9,7 +9,7 @@ Version 2 is a new implementation built around the documented NordVPN and
 WireGuard command-line interfaces. It replaces the earlier prototype rather than
 continuing its source code.
 
-Current release: **2.0.1**
+Current release: **2.0.2**
 
 > NordConverter is unofficial and is not affiliated with or endorsed by Nord
 > Security or the WireGuard project. Generated profiles contain private keys.
