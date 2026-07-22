@@ -1,7 +1,8 @@
 # Attribution notice
 
-The current NordConverter edition and its modifications are maintained by
-**Deano86**.
+The current NordConverter edition has been modified and is maintained by
+**Deano86**. This credit applies to the NordConverter modifications and does not
+claim authorship or ownership of the original NordVPN-Wireguard project.
 
 NordConverter was originally based on **NordVPN-Wireguard**, created by Stefano
 Fiorini:
