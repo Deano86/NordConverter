@@ -597,7 +597,7 @@ choose_destination() {
   [4] Country + city    A city within a selected country
   [5] Server            Browse and select an exact hostname
   [6] Group             P2P, Double VPN, Onion, or Dedicated IP
-  [7] Raw connect args  Arguments placed after "nordvpn connect"
+  [7] Advanced          Arguments placed after "nordvpn connect"
   [8] Exit
 EOF
         printf '\n'
