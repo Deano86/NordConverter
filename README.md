@@ -1,10 +1,23 @@
 # NordConverter
 <img width="479" height="307" alt="image" src="https://github.com/user-attachments/assets/60b79ffe-cdc0-4891-98fe-9a2c3bfc7270" />
 
-
 `NordConverter.sh` is an interactive Bash script that logs in to the NordVPN
 Linux client when needed, temporarily connects using NordLynx, and creates an
 importable WireGuard `.conf` file.
+
+## Attribution and licensing
+
+NordConverter was originally based on
+[NordVPN-Wireguard](https://github.com/sfiorini/NordVPN-Wireguard) by Stefano
+Fiorini. It has since been substantially modified with an interactive menu,
+integrated browser/callback/token login handling, input validation, safer
+cleanup, secure output permissions, and rewritten documentation.
+
+No license file was identified in the upstream repository when this version was
+prepared. Under GitHub's licensing guidance, a public repository without a
+license remains subject to standard copyright restrictions. This attribution
+does not itself grant permission to reproduce or distribute upstream code. See
+[`NOTICE.md`](NOTICE.md) for the full notice.
 
 > This is an unofficial helper. A generated configuration contains a private key.
 > Keep it secret, never commit it to source control, and delete it when it is no
@@ -118,3 +131,4 @@ because it contains the private key used by that tunnel.
 
 - [Install and use NordVPN on Linux](https://support.nordvpn.com/hc/en-us/articles/20196094470929-How-to-install-the-NordVPN-app-on-Linux-distributions)
 - [Log in on a headless Linux device using an access token](https://support.nordvpn.com/hc/en-us/articles/20226600447633-How-to-log-in-to-NordVPN-on-Linux-devices-without-a-GUI)
+- [GitHub guidance for repositories without a license](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository)
