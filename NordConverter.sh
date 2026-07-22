@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 
 readonly APP_NAME="NordConverter"
-readonly VERSION="2.0.0"
+readonly VERSION="2.0.1"
 readonly TUNNEL_INTERFACE="nordlynx"
 readonly PROFILE_DNS="103.86.96.100, 103.86.99.100"
 
@@ -321,7 +321,9 @@ connection_active() {
 clear_existing_connection() {
     local answer
 
-    connection_active || return
+    # No existing connection is the normal case, not an error. Return success so
+    # `set -e` does not stop the export immediately after confirmation.
+    connection_active || return 0
     say_warn 'NordVPN is already connected. NordConverter must replace that connection temporarily.'
     [[ -t 0 ]] || fail 'Disconnect NordVPN before running non-interactively.'
     read -r -p '[?] Disconnect the current session and continue? [y/N]: ' answer
