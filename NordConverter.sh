@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 
 readonly APP_NAME="NordConverter"
-readonly VERSION="2.0.2"
+readonly VERSION="2.1.0"
 readonly TUNNEL_INTERFACE="nordlynx"
 readonly PROFILE_DNS="103.86.96.100, 103.86.99.100"
 
@@ -15,6 +15,14 @@ declare -a CONNECT_TARGET=()
 OUTPUT_DIRECTORY=$PWD
 PLAIN_OUTPUT=false
 DESTINATION_SUPPLIED=false
+ASSUME_YES=false
+RECOMMENDED_REQUESTED=false
+COUNTRY_REQUEST=''
+CITY_REQUEST=''
+SERVER_REQUEST=''
+GROUP_REQUEST=''
+LIST_REQUEST=''
+LIST_REQUEST_VALUE=''
 CREATED_CONNECTION=false
 WORK_FILE=''
 
@@ -37,6 +45,15 @@ Usage:
 
 NordConverter options:
   --output-dir DIRECTORY           Directory for the generated profile
+  --recommended                    Use the recommended server
+  --country COUNTRY                Connect by country name or code
+  --city CITY                      Connect by city (combine with --country)
+  --server SERVER                  Connect to an exact server, such as uk715
+  --group GROUP                    Select a specialty server group
+  --yes                            Accept confirmation prompts
+  --list-countries                 Print available countries and exit
+  --list-cities COUNTRY            Print cities for a country and exit
+  --list-groups                    Print available server groups and exit
   --no-color                       Disable terminal colours
   -h, --help                       Show help
   -v, --version                    Show version
@@ -46,7 +63,9 @@ Examples:
   ${0##*/}
   ${0##*/} Canada
   ${0##*/} Germany Berlin
-  ${0##*/} --group p2p gb
+  ${0##*/} --country Germany --city Berlin --yes
+  ${0##*/} --group p2p --country gb --yes
+  ${0##*/} --list-cities united_kingdom
   ${0##*/} --output-dir ./profiles Japan
 EOF
 }
@@ -61,6 +80,53 @@ parse_command_line() {
                 ;;
             --no-color)
                 PLAIN_OUTPUT=true
+                shift
+                ;;
+            --recommended)
+                RECOMMENDED_REQUESTED=true
+                DESTINATION_SUPPLIED=true
+                shift
+                ;;
+            --country)
+                (($# >= 2)) || { printf 'Missing value after --country.\n' >&2; exit 2; }
+                COUNTRY_REQUEST=$2
+                DESTINATION_SUPPLIED=true
+                shift 2
+                ;;
+            --city)
+                (($# >= 2)) || { printf 'Missing value after --city.\n' >&2; exit 2; }
+                CITY_REQUEST=$2
+                DESTINATION_SUPPLIED=true
+                shift 2
+                ;;
+            --server)
+                (($# >= 2)) || { printf 'Missing value after --server.\n' >&2; exit 2; }
+                SERVER_REQUEST=$2
+                DESTINATION_SUPPLIED=true
+                shift 2
+                ;;
+            --group)
+                (($# >= 2)) || { printf 'Missing value after --group.\n' >&2; exit 2; }
+                GROUP_REQUEST=$2
+                DESTINATION_SUPPLIED=true
+                shift 2
+                ;;
+            --yes|-y)
+                ASSUME_YES=true
+                shift
+                ;;
+            --list-countries)
+                LIST_REQUEST='countries'
+                shift
+                ;;
+            --list-cities)
+                (($# >= 2)) || { printf 'Missing country after --list-cities.\n' >&2; exit 2; }
+                LIST_REQUEST='cities'
+                LIST_REQUEST_VALUE=$2
+                shift 2
+                ;;
+            --list-groups)
+                LIST_REQUEST='groups'
                 shift
                 ;;
             -h|--help)
@@ -86,6 +152,44 @@ parse_command_line() {
                 ;;
         esac
     done
+}
+
+build_structured_target() {
+    local structured=false
+
+    [[ -n "$COUNTRY_REQUEST$CITY_REQUEST$SERVER_REQUEST$GROUP_REQUEST" ]] && structured=true
+
+    if [[ "$RECOMMENDED_REQUESTED" == true ]]; then
+        [[ "$structured" == false && ${#CONNECT_TARGET[@]} -eq 0 ]] || \
+            fail '--recommended cannot be combined with another destination.'
+        CONNECT_TARGET=()
+        return
+    fi
+
+    if [[ -n "$SERVER_REQUEST" ]]; then
+        [[ -z "$COUNTRY_REQUEST$CITY_REQUEST$GROUP_REQUEST" && ${#CONNECT_TARGET[@]} -eq 0 ]] || \
+            fail '--server cannot be combined with country, city, group, or raw arguments.'
+        CONNECT_TARGET=("$SERVER_REQUEST")
+        return
+    fi
+
+    if [[ -n "$GROUP_REQUEST" ]]; then
+        [[ -z "$CITY_REQUEST" ]] || fail '--group cannot be combined with --city.'
+        if ((${#CONNECT_TARGET[@]} == 1)) && [[ -z "$COUNTRY_REQUEST" ]]; then
+            COUNTRY_REQUEST=${CONNECT_TARGET[0]}
+            CONNECT_TARGET=()
+        fi
+        ((${#CONNECT_TARGET[@]} == 0)) || fail 'Use --group GROUP --country COUNTRY, or place raw arguments after --.'
+        CONNECT_TARGET=(--group "$GROUP_REQUEST")
+        [[ -n "$COUNTRY_REQUEST" ]] && CONNECT_TARGET+=("$COUNTRY_REQUEST")
+        return
+    fi
+
+    if [[ -n "$COUNTRY_REQUEST$CITY_REQUEST" ]]; then
+        ((${#CONNECT_TARGET[@]} == 0)) || fail 'Named destination options cannot be combined with raw arguments.'
+        [[ -n "$COUNTRY_REQUEST" ]] && CONNECT_TARGET+=("$COUNTRY_REQUEST")
+        [[ -n "$CITY_REQUEST" ]] && CONNECT_TARGET+=("$CITY_REQUEST")
+    fi
 }
 
 configure_style() {
@@ -249,6 +353,40 @@ EOF
     say_ok 'NordVPN account is ready.'
 }
 
+country_lookup_value() {
+    local value=$1
+    printf '%s' "${value// /_}"
+}
+
+show_countries() {
+    section 'AVAILABLE COUNTRIES'
+    nordvpn countries || say_warn 'NordVPN could not retrieve the country list.'
+    printf '\n'
+}
+
+show_cities() {
+    local country=$1 lookup
+    lookup=$(country_lookup_value "$country")
+    section "AVAILABLE CITIES: $country"
+    nordvpn cities "$lookup" || say_warn "NordVPN could not retrieve cities for $country."
+    printf '\n'
+}
+
+show_groups() {
+    section 'AVAILABLE SERVER GROUPS'
+    nordvpn groups || say_warn 'NordVPN could not retrieve the server-group list.'
+    printf '\n'
+}
+
+run_list_request() {
+    case "$LIST_REQUEST" in
+        countries) show_countries ;;
+        cities) show_cities "$LIST_REQUEST_VALUE" ;;
+        groups) show_groups ;;
+        *) fail "Unknown list request: $LIST_REQUEST" ;;
+    esac
+}
+
 choose_destination() {
     local choice first second raw
 
@@ -269,17 +407,31 @@ EOF
 
         case "$choice" in
             1) CONNECT_TARGET=(); return ;;
-            2) first=$(prompt_required 'Country/code: '); CONNECT_TARGET=("$first"); return ;;
-            3) first=$(prompt_required 'City: '); CONNECT_TARGET=("$first"); return ;;
+            2)
+                show_countries
+                first=$(prompt_required 'Country/code: ')
+                CONNECT_TARGET=("$first")
+                return
+                ;;
+            3)
+                show_countries
+                first=$(prompt_required 'Country containing the city: ')
+                show_cities "$first"
+                second=$(prompt_required 'City: ')
+                CONNECT_TARGET=("$first" "$second")
+                return
+                ;;
             4)
+                show_countries
                 first=$(prompt_required 'Country: ')
+                show_cities "$first"
                 second=$(prompt_required 'City: ')
                 CONNECT_TARGET=("$first" "$second")
                 return
                 ;;
             5) first=$(prompt_required 'Server: '); CONNECT_TARGET=("$first"); return ;;
             6)
-                printf 'Examples: p2p, double_vpn, onion_over_vpn, dedicated_ip\n'
+                show_groups
                 first=$(prompt_required 'Group: ')
                 read -r -p 'Optional country/code: ' second
                 CONNECT_TARGET=(--group "$first")
@@ -311,6 +463,12 @@ confirm_job() {
     section 'REVIEW'
     printf '  Target       : %s%s%s\n' "$CLR_BOLD" "$(target_description)" "$CLR_END"
     printf '  Output folder: %s\n\n' "$OUTPUT_DIRECTORY"
+
+    if [[ "$ASSUME_YES" == true ]]; then
+        say_info 'Confirmation accepted by --yes.'
+        return 0
+    fi
+
     read -r -p "${CLR_BOLD}[?] Continue? [Y/n]: ${CLR_END}" answer
 
     case "${answer:-y}" in
@@ -330,6 +488,12 @@ clear_existing_connection() {
     # `set -e` does not stop the export immediately after confirmation.
     connection_active || return 0
     say_warn 'NordVPN is already connected. NordConverter must replace that connection temporarily.'
+
+    if [[ "$ASSUME_YES" == true ]]; then
+        nordvpn disconnect >/dev/null || fail 'Could not disconnect NordVPN.'
+        return 0
+    fi
+
     [[ -t 0 ]] || fail 'Disconnect NordVPN before running non-interactively.'
     read -r -p '[?] Disconnect the current session and continue? [y/N]: ' answer
     case "$answer" in
@@ -443,6 +607,7 @@ export_profile() {
 main() {
     parse_command_line "$@"
     configure_style
+    build_structured_target
     banner
     preflight
     trap cleanup EXIT
@@ -450,6 +615,10 @@ main() {
     trap 'exit 143' TERM
 
     login_assistant
+    if [[ -n "$LIST_REQUEST" ]]; then
+        run_list_request
+        exit 0
+    fi
     if [[ "$DESTINATION_SUPPLIED" == false ]]; then
         choose_destination
     fi
