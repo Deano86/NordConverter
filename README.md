@@ -1,4 +1,6 @@
 # NordConverter
+<img width="479" height="307" alt="image" src="https://github.com/user-attachments/assets/60b79ffe-cdc0-4891-98fe-9a2c3bfc7270" />
+
 
 `NordConverter.sh` is an interactive Bash script that logs in to the NordVPN
 Linux client when needed, temporarily connects using NordLynx, and creates an
