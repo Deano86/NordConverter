@@ -1,4 +1,6 @@
 # NordConverter
+**By Deano86**
+
 <img width="479" height="307" alt="image" src="https://github.com/user-attachments/assets/60b79ffe-cdc0-4891-98fe-9a2c3bfc7270" />
 
 `NordConverter.sh` is an interactive Bash script that logs in to the NordVPN
@@ -12,6 +14,9 @@ NordConverter was originally based on
 Fiorini. It has since been substantially modified with an interactive menu,
 integrated browser/callback/token login handling, input validation, safer
 cleanup, secure output permissions, and rewritten documentation.
+
+The current NordConverter edition and its modifications are maintained by
+**Deano86**.
 
 No license file was identified in the upstream repository when this version was
 prepared. Under GitHub's licensing guidance, a public repository without a
@@ -48,6 +53,13 @@ Make the script executable, then run it:
 ```bash
 chmod +x NordConverter.sh
 ./NordConverter.sh
+```
+
+NordConverter uses a coloured ASCII terminal interface when output is connected
+to a terminal. Set `NO_COLOR=1` for plain output:
+
+```bash
+NO_COLOR=1 ./NordConverter.sh
 ```
 
 The script checks whether the NordVPN CLI is already authenticated. If it is not,
