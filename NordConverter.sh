@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # NordConverter
-# By Deano86
+# Modified and maintained by Deano86
 #
 # Originally based on NordVPN-Wireguard by Stefano Fiorini:
 # https://github.com/sfiorini/NordVPN-Wireguard
@@ -54,7 +54,7 @@ EOF
     printf '%s\n' '------------------------------------------------------------------------'
     printf '  %sNordVPN -> WireGuard configuration generator%s' "$C_BOLD" "$C_RESET"
     printf '  %sv%s%s\n' "$C_DIM" "$VERSION" "$C_RESET"
-    printf '  %sBy Deano86%s\n' "$C_DIM" "$C_RESET"
+    printf '  %sModified and maintained by Deano86%s\n' "$C_DIM" "$C_RESET"
     printf '%s\n\n' '------------------------------------------------------------------------'
 }
 
