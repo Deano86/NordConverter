@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+# NordConverter
+#
+# Originally based on NordVPN-Wireguard by Stefano Fiorini:
+# https://github.com/sfiorini/NordVPN-Wireguard
+#
+# This version has been substantially modified with an interactive menu,
+# integrated login handling, validation, safer cleanup, and revised
+# documentation. See NOTICE.md for attribution and licensing information.
+
 set -Eeuo pipefail
 
 readonly VERSION="1.1.0"
