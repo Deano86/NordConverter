@@ -7,13 +7,14 @@
 set -Eeuo pipefail
 
 readonly APP_NAME="NordConverter"
-readonly VERSION="2.0.1"
+readonly VERSION="2.0.2"
 readonly TUNNEL_INTERFACE="nordlynx"
 readonly PROFILE_DNS="103.86.96.100, 103.86.99.100"
 
 declare -a CONNECT_TARGET=()
 OUTPUT_DIRECTORY=$PWD
 PLAIN_OUTPUT=false
+DESTINATION_SUPPLIED=false
 CREATED_CONNECTION=false
 WORK_FILE=''
 
@@ -72,11 +73,15 @@ parse_command_line() {
                 ;;
             --)
                 shift
-                CONNECT_TARGET+=("$@")
+                if (($#)); then
+                    CONNECT_TARGET+=("$@")
+                    DESTINATION_SUPPLIED=true
+                fi
                 break
                 ;;
             *)
                 CONNECT_TARGET+=("$1")
+                DESTINATION_SUPPLIED=true
                 shift
                 ;;
         esac
@@ -436,11 +441,6 @@ export_profile() {
 }
 
 main() {
-    local interactive=true
-
-    if (($#)); then
-        interactive=false
-    fi
     parse_command_line "$@"
     configure_style
     banner
@@ -450,7 +450,7 @@ main() {
     trap 'exit 143' TERM
 
     login_assistant
-    if [[ "$interactive" == true && ${#CONNECT_TARGET[@]} -eq 0 ]]; then
+    if [[ "$DESTINATION_SUPPLIED" == false ]]; then
         choose_destination
     fi
     confirm_job
