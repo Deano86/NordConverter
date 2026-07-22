@@ -55,6 +55,11 @@ connection, and export. It supports:
 - specialty groups such as P2P and Double VPN;
 - advanced NordVPN connection arguments.
 
+Long-running operations display a portable ASCII spinner (`| / - \\`) followed
+by a success or failure marker. When output is redirected or no interactive
+terminal is present, NordConverter automatically uses ordinary status lines
+instead of animation.
+
 ## Login assistant
 
 If the NordVPN CLI is not authenticated, NordConverter offers:
@@ -203,6 +208,8 @@ NO_COLOR=1 ./NordConverter.sh
 NordConverter:
 
 - checks dependencies before connecting;
+- animates long-running connection, API, and tunnel-reading operations;
+- preserves underlying command errors when an animated operation fails;
 - asks before replacing an existing NordVPN connection;
 - reads the active interface through `wg showconf`;
 - writes through a private temporary file and moves it into place atomically;

@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 
 readonly APP_NAME="NordConverter"
-readonly VERSION="2.2.1"
+readonly VERSION="2.3.0"
 readonly TUNNEL_INTERFACE="nordlynx"
 readonly PROFILE_DNS="103.86.96.100, 103.86.99.100"
 
@@ -26,6 +26,8 @@ LIST_REQUEST_VALUE=''
 SERVER_LIST_LIMIT=25
 CREATED_CONNECTION=false
 WORK_FILE=''
+STEP_LOG=''
+SPINNER_PID=''
 
 CLR_TITLE=''
 CLR_ACCENT=''
@@ -259,6 +261,89 @@ say_warn() {
     printf '%s[!]%s %s\n' "$CLR_WARN" "$CLR_END" "$*" >&2
 }
 
+start_spinner() {
+    local message=$1
+
+    if [[ ! -t 2 ]]; then
+        say_info "$message"
+        SPINNER_PID=''
+        return
+    fi
+
+    (
+        local index=0
+        local -a frames=('|' '/' '-' '\')
+        trap 'exit 0' TERM INT
+        while true; do
+            printf '\r%s[%s]%s %s' \
+                "$CLR_ACCENT" "${frames[index % 4]}" "$CLR_END" "$message" >&2
+            index=$((index + 1))
+            sleep 0.12
+        done
+    ) &
+    SPINNER_PID=$!
+}
+
+stop_spinner() {
+    local result=$1 message=$2
+
+    if [[ -n "$SPINNER_PID" ]]; then
+        kill "$SPINNER_PID" >/dev/null 2>&1 || true
+        wait "$SPINNER_PID" 2>/dev/null || true
+        SPINNER_PID=''
+        printf '\r\033[2K' >&2
+    fi
+
+    if ((result == 0)); then
+        say_ok "$message"
+    else
+        say_warn "Failed: $message"
+    fi
+}
+
+run_step() {
+    local message=$1 result
+    shift
+
+    STEP_LOG=$(mktemp) || fail 'Could not create a temporary operation log.'
+    start_spinner "$message"
+    if "$@" >"$STEP_LOG" 2>&1; then
+        result=0
+    else
+        result=$?
+    fi
+    stop_spinner "$result" "$message"
+
+    if ((result != 0)); then
+        cat "$STEP_LOG" >&2
+    fi
+    rm -f -- "$STEP_LOG"
+    STEP_LOG=''
+    return "$result"
+}
+
+capture_step() {
+    local variable_name=$1 message=$2 result output
+    shift 2
+
+    STEP_LOG=$(mktemp) || fail 'Could not create a temporary operation log.'
+    start_spinner "$message"
+    if output=$("$@" 2>"$STEP_LOG"); then
+        result=0
+        printf -v "$variable_name" '%s' "$output"
+    else
+        result=$?
+    fi
+    stop_spinner "$result" "$message"
+
+    if ((result != 0)); then
+        cat "$STEP_LOG" >&2
+    fi
+    rm -f -- "$STEP_LOG"
+    STEP_LOG=''
+    return "$result"
+}
+
 fail() {
     printf '%s[x]%s %s\n' "$CLR_ERROR" "$CLR_END" "$*" >&2
     exit 1
@@ -269,6 +354,15 @@ cleanup() {
 
     if [[ -n "$WORK_FILE" && -e "$WORK_FILE" ]]; then
         rm -f -- "$WORK_FILE"
+    fi
+
+    if [[ -n "$STEP_LOG" && -e "$STEP_LOG" ]]; then
+        rm -f -- "$STEP_LOG"
+    fi
+
+    if [[ -n "$SPINNER_PID" ]]; then
+        kill "$SPINNER_PID" >/dev/null 2>&1 || true
+        wait "$SPINNER_PID" 2>/dev/null || true
     fi
 
     if [[ "$CREATED_CONNECTION" == true ]]; then
@@ -286,7 +380,7 @@ require_program() {
 
 preflight() {
     local program
-    local -a programs=(nordvpn wg ip awk mktemp chmod mv mkdir rm date)
+    local -a programs=(nordvpn wg ip awk mktemp chmod mv mkdir rm date sleep)
 
     if ((EUID != 0)); then
         programs+=(sudo)
@@ -413,7 +507,8 @@ resolve_country_id() {
     key=${key// /_}
     key=${key//-/_}
 
-    if ! countries_json=$(curl -fsSL 'https://api.nordvpn.com/v1/servers/countries'); then
+    if ! capture_step countries_json 'Resolving the country filter...' \
+        curl -fsSL 'https://api.nordvpn.com/v1/servers/countries'; then
         say_warn 'The NordVPN country catalogue could not be downloaded.'
         return 1
     fi
@@ -450,8 +545,9 @@ show_servers() {
     fi
 
     section "RECOMMENDED ONLINE SERVERS${country:+: $country}"
-    say_info "Requesting up to $SERVER_LIST_LIMIT NordLynx servers..."
-    if ! server_json=$("${request[@]}"); then
+    if ! capture_step server_json \
+        "Requesting up to $SERVER_LIST_LIMIT NordLynx servers..." \
+        "${request[@]}"; then
         say_warn 'The NordVPN server API request failed.'
         return 1
     fi
@@ -613,14 +709,18 @@ clear_existing_connection() {
     say_warn 'NordVPN is already connected. NordConverter must replace that connection temporarily.'
 
     if [[ "$ASSUME_YES" == true ]]; then
-        nordvpn disconnect >/dev/null || fail 'Could not disconnect NordVPN.'
+        run_step 'Disconnecting the existing NordVPN session...' nordvpn disconnect || \
+            fail 'Could not disconnect NordVPN.'
         return 0
     fi
 
     [[ -t 0 ]] || fail 'Disconnect NordVPN before running non-interactively.'
     read -r -p '[?] Disconnect the current session and continue? [y/N]: ' answer
     case "$answer" in
-        y|Y|yes|YES|Yes) nordvpn disconnect >/dev/null || fail 'Could not disconnect NordVPN.' ;;
+        y|Y|yes|YES|Yes)
+            run_step 'Disconnecting the existing NordVPN session...' nordvpn disconnect || \
+                fail 'Could not disconnect NordVPN.'
+            ;;
         *) exit 0 ;;
     esac
 }
@@ -691,19 +791,22 @@ export_profile() {
     local raw_config address private_key listen_port peer_key endpoint
 
     section 'EXPORT'
-    say_info 'Selecting NordLynx...'
-    nordvpn set technology NordLynx >/dev/null || fail 'NordLynx could not be selected.'
+    run_step 'Selecting NordLynx...' nordvpn set technology NordLynx || \
+        fail 'NordLynx could not be selected.'
 
-    say_info 'Connecting to the selected destination...'
     if ((${#CONNECT_TARGET[@]})); then
-        nordvpn connect "${CONNECT_TARGET[@]}" || fail 'NordVPN could not establish the requested connection.'
+        run_step 'Connecting to the selected destination...' \
+            nordvpn connect "${CONNECT_TARGET[@]}" || \
+            fail 'NordVPN could not establish the requested connection.'
     else
-        nordvpn connect || fail 'NordVPN could not establish a recommended connection.'
+        run_step 'Connecting to a recommended server...' nordvpn connect || \
+            fail 'NordVPN could not establish a recommended connection.'
     fi
     CREATED_CONNECTION=true
 
-    say_info 'Reading the active tunnel profile...'
-    raw_config=$(wg_read showconf "$TUNNEL_INTERFACE") || fail 'WireGuard could not read the NordLynx interface.'
+    capture_step raw_config 'Reading the active tunnel profile...' \
+        wg_read showconf "$TUNNEL_INTERFACE" || \
+        fail 'WireGuard could not read the NordLynx interface.'
     address=$(tunnel_address)
     private_key=$(config_field 'PrivateKey' "$raw_config")
     listen_port=$(config_field 'ListenPort' "$raw_config")
@@ -716,7 +819,7 @@ export_profile() {
 
     write_profile "$address" "$private_key" "$listen_port" "$peer_key" "$endpoint"
 
-    if nordvpn disconnect >/dev/null; then
+    if run_step 'Disconnecting the temporary NordVPN session...' nordvpn disconnect; then
         CREATED_CONNECTION=false
     else
         say_warn 'The profile was saved, but NordVPN did not disconnect cleanly.'
