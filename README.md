@@ -1,8 +1,8 @@
-# NordVPN to WireGuard configuration generator
+# NordConverter
 
-An interactive Bash script that logs in to the NordVPN Linux client when needed,
-temporarily connects using NordLynx, and creates an importable WireGuard `.conf`
-file.
+`NordConverter.sh` is an interactive Bash script that logs in to the NordVPN
+Linux client when needed, temporarily connects using NordLynx, and creates an
+importable WireGuard `.conf` file.
 
 > This is an unofficial helper. A generated configuration contains a private key.
 > Keep it secret, never commit it to source control, and delete it when it is no
@@ -31,8 +31,8 @@ sudo reboot
 Make the script executable, then run it:
 
 ```bash
-chmod +x NordVpnToWireguard.sh
-./NordVpnToWireguard.sh
+chmod +x NordConverter.sh
+./NordConverter.sh
 ```
 
 The script checks whether the NordVPN CLI is already authenticated. If it is not,
@@ -92,13 +92,13 @@ Arguments are passed unchanged to `nordvpn connect`. If login is required and th
 command is running in a terminal, the login menu is displayed first.
 
 ```bash
-./NordVpnToWireguard.sh Canada
-./NordVpnToWireguard.sh Germany Berlin
-./NordVpnToWireguard.sh jp35
-./NordVpnToWireguard.sh --group double_vpn us
+./NordConverter.sh Canada
+./NordConverter.sh Germany Berlin
+./NordConverter.sh jp35
+./NordConverter.sh --group double_vpn us
 ```
 
-Run `./NordVpnToWireguard.sh --help` for built-in help.
+Run `./NordConverter.sh --help` for built-in help.
 
 ## Generated configuration
 
