@@ -46,8 +46,10 @@ The interface guides you through login, destination selection, confirmation,
 connection, and export. It supports:
 
 - recommended servers;
-- countries and country codes;
-- cities and country/city combinations;
+- live country lists from `nordvpn countries`;
+- live country-specific city lists from `nordvpn cities COUNTRY`;
+- live specialty-group lists from `nordvpn groups`;
+- countries, country codes, cities, and country/city combinations;
 - exact server names;
 - specialty groups such as P2P and Double VPN;
 - advanced NordVPN connection arguments.
@@ -65,26 +67,93 @@ NordConverter.
 
 ## Command-line use
 
+NordConverter can run without the interactive destination menu. Named options
+are recommended for scripts because they make the intended destination clear.
+
+```bash
+./NordConverter.sh --recommended --yes
+./NordConverter.sh --country Canada --yes
+./NordConverter.sh --country Germany --city Berlin --yes
+./NordConverter.sh --server uk715 --yes
+./NordConverter.sh --group p2p --country gb --yes
+./NordConverter.sh --country Japan --output-dir ./profiles --yes
+```
+
+Positional destinations remain supported:
+
 ```bash
 ./NordConverter.sh Canada
 ./NordConverter.sh Germany Berlin
-./NordConverter.sh --group p2p gb
-./NordConverter.sh --output-dir ./profiles Japan
+./NordConverter.sh uk715
 ```
 
-Use `--` when a NordVPN argument conflicts with a NordConverter option:
+### Complete NordConverter option reference
+
+| Option | Value | Purpose |
+| --- | --- | --- |
+| `--recommended` | none | Use NordVPN's recommended server |
+| `--country` | name or code | Select a country, such as `Canada`, `gb`, or `united_kingdom` |
+| `--city` | city name | Select a city; it can be combined with `--country` |
+| `--server` | server name | Select an exact server, such as `uk715` |
+| `--group` | group name | Select a specialty group, such as `p2p` or `double_vpn` |
+| `--output-dir` | directory | Choose where the generated profile is written |
+| `--yes`, `-y` | none | Accept confirmation and existing-connection replacement prompts |
+| `--list-countries` | none | Print the current NordVPN country list and exit |
+| `--list-cities` | country | Print cities for one country and exit |
+| `--list-groups` | none | Print the current specialty-group list and exit |
+| `--no-color` | none | Disable terminal colours |
+| `--help`, `-h` | none | Show built-in help |
+| `--version`, `-v` | none | Show the NordConverter version |
+| `--` | arguments | Pass all remaining arguments directly to `nordvpn connect` |
+
+### Discover valid values
+
+Values are supplied by the installed NordVPN client, so the live lists are more
+reliable than a static list in this README:
 
 ```bash
-./NordConverter.sh -- --group double_vpn us
+./NordConverter.sh --list-countries
+./NordConverter.sh --list-cities united_kingdom
+./NordConverter.sh --list-groups
 ```
 
-Other options:
+Equivalent native NordVPN commands are:
 
-```text
---output-dir DIRECTORY   Select the profile directory
---no-color               Disable terminal colours
--h, --help               Show help
--v, --version            Show the version
+```bash
+nordvpn countries
+nordvpn cities united_kingdom
+nordvpn groups
+```
+
+Common group values include `p2p`, `double_vpn`, `onion_over_vpn`, and
+`dedicated_ip`. Availability depends on the account, region, and installed
+NordVPN client.
+
+### Advanced passthrough
+
+The interactive **Advanced** choice splits the entered text into arguments and
+passes them to `nordvpn connect` without evaluating them as shell commands.
+
+For non-interactive raw arguments, place `--` before the native NordVPN
+connection arguments:
+
+```bash
+./NordConverter.sh --yes -- --group double_vpn gb
+```
+
+This executes the connection stage as if the destination arguments had been
+supplied to:
+
+```bash
+nordvpn connect --group double_vpn gb
+```
+
+Because NordVPN may add or remove CLI options, use the installed client's help
+for the authoritative raw-argument list:
+
+```bash
+nordvpn help connect
+man nordvpn
 ```
 
 The standard `NO_COLOR` environment variable is also respected:
