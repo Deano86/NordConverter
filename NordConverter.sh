@@ -10,7 +10,7 @@ readonly DEFAULT_DNS="103.86.96.100, 103.86.99.100"
 connected_by_script=false
 
 print_banner() {
-    printf '\nNordVPN to WireGuard configuration generator v%s\n' "$VERSION"
+    printf '\nNordConverter v%s - NordVPN to WireGuard generator\n' "$VERSION"
     printf '%s\n\n' '------------------------------------------------'
 }
 
@@ -266,7 +266,7 @@ main() {
     CONNECT_ARGS=()
     case "${1:-}" in
         -h|--help) print_help; exit 0 ;;
-        -v|--version) printf 'WireGuard Config Files for NordVPN v%s\n' "$VERSION"; exit 0 ;;
+        -v|--version) printf 'NordConverter v%s\n' "$VERSION"; exit 0 ;;
     esac
     need_command nordvpn
     need_command wg
