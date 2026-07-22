@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 
 readonly APP_NAME="NordConverter"
-readonly VERSION="2.1.0"
+readonly VERSION="2.2.1"
 readonly TUNNEL_INTERFACE="nordlynx"
 readonly PROFILE_DNS="103.86.96.100, 103.86.99.100"
 
@@ -23,6 +23,7 @@ SERVER_REQUEST=''
 GROUP_REQUEST=''
 LIST_REQUEST=''
 LIST_REQUEST_VALUE=''
+SERVER_LIST_LIMIT=25
 CREATED_CONNECTION=false
 WORK_FILE=''
 
@@ -54,6 +55,8 @@ NordConverter options:
   --list-countries                 Print available countries and exit
   --list-cities COUNTRY            Print cities for a country and exit
   --list-groups                    Print available server groups and exit
+  --list-servers                   Print recommended online NordLynx servers
+  --limit NUMBER                   Limit --list-servers results (default: 25)
   --no-color                       Disable terminal colours
   -h, --help                       Show help
   -v, --version                    Show version
@@ -66,6 +69,7 @@ Examples:
   ${0##*/} --country Germany --city Berlin --yes
   ${0##*/} --group p2p --country gb --yes
   ${0##*/} --list-cities united_kingdom
+  ${0##*/} --list-servers --country gb --limit 20
   ${0##*/} --output-dir ./profiles Japan
 EOF
 }
@@ -129,6 +133,19 @@ parse_command_line() {
                 LIST_REQUEST='groups'
                 shift
                 ;;
+            --list-servers)
+                LIST_REQUEST='servers'
+                shift
+                ;;
+            --limit)
+                (($# >= 2)) || { printf 'Missing number after --limit.\n' >&2; exit 2; }
+                [[ "$2" =~ ^[0-9]+$ ]] && ((10#$2 >= 1 && 10#$2 <= 100)) || {
+                    printf '%s\n' '--limit must be a number from 1 to 100.' >&2
+                    exit 2
+                }
+                SERVER_LIST_LIMIT=$((10#$2))
+                shift 2
+                ;;
             -h|--help)
                 usage
                 exit 0
@@ -190,6 +207,10 @@ build_structured_target() {
         [[ -n "$COUNTRY_REQUEST" ]] && CONNECT_TARGET+=("$COUNTRY_REQUEST")
         [[ -n "$CITY_REQUEST" ]] && CONNECT_TARGET+=("$CITY_REQUEST")
     fi
+
+    # Optional structured fields may be absent. Always report successful target
+    # construction after validation so `set -e` does not treat that as an error.
+    return 0
 }
 
 configure_style() {
@@ -378,11 +399,92 @@ show_groups() {
     printf '\n'
 }
 
+server_api_ready() {
+    if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+        say_warn "Server listing requires the optional packages 'curl' and 'jq'."
+        say_warn 'On Ubuntu: sudo apt install curl jq'
+        return 1
+    fi
+}
+
+resolve_country_id() {
+    local country=$1 key countries_json country_id
+    key=${country,,}
+    key=${key// /_}
+    key=${key//-/_}
+
+    if ! countries_json=$(curl -fsSL 'https://api.nordvpn.com/v1/servers/countries'); then
+        say_warn 'The NordVPN country catalogue could not be downloaded.'
+        return 1
+    fi
+
+    country_id=$(jq -r --arg key "$key" '
+        [ .[] | select(
+            ((.code // "") | ascii_downcase) == $key or
+            ((.name // "") | ascii_downcase | gsub("[ _-]+"; "_")) == $key
+        ) ][0].id // empty
+    ' <<< "$countries_json")
+
+    if [[ -z "$country_id" ]]; then
+        say_warn "No API country matched: $country"
+        return 1
+    fi
+
+    printf '%s' "$country_id"
+}
+
+show_servers() {
+    local country=${1:-} country_id='' server_json count
+    local -a request=(
+        curl -fsSLG 'https://api.nordvpn.com/v1/servers/recommendations'
+        --data-urlencode "limit=$SERVER_LIST_LIMIT"
+        --data-urlencode 'filters[servers.status]=online'
+        --data-urlencode 'filters[servers_technologies][identifier]=wireguard_udp'
+    )
+
+    server_api_ready || return 1
+
+    if [[ -n "$country" ]]; then
+        country_id=$(resolve_country_id "$country") || return 1
+        request+=(--data-urlencode "filters[country_id]=$country_id")
+    fi
+
+    section "RECOMMENDED ONLINE SERVERS${country:+: $country}"
+    say_info "Requesting up to $SERVER_LIST_LIMIT NordLynx servers..."
+    if ! server_json=$("${request[@]}"); then
+        say_warn 'The NordVPN server API request failed.'
+        return 1
+    fi
+
+    if ! jq -e 'type == "array"' >/dev/null <<< "$server_json"; then
+        say_warn 'The NordVPN server API returned an unexpected response.'
+        return 1
+    fi
+
+    count=$(jq 'length' <<< "$server_json")
+    if ((count == 0)); then
+        say_warn 'No matching online NordLynx servers were returned.'
+        return 1
+    fi
+
+    printf '%-24s %-22s %-22s %s\n' 'HOSTNAME' 'COUNTRY' 'CITY' 'LOAD'
+    printf '%-24s %-22s %-22s %s\n' '------------------------' '----------------------' '----------------------' '----'
+    jq -r '.[] | [
+        (.hostname // "-"),
+        (.locations[0].country.name // "-"),
+        (.locations[0].country.city.name // "-"),
+        ((.load // 0 | tostring) + "%")
+    ] | @tsv' <<< "$server_json" |
+        awk -F '\t' '{printf "%-24s %-22s %-22s %s\n", $1, $2, $3, $4}'
+    printf '\n'
+}
+
 run_list_request() {
     case "$LIST_REQUEST" in
         countries) show_countries ;;
         cities) show_cities "$LIST_REQUEST_VALUE" ;;
         groups) show_groups ;;
+        servers) show_servers "$COUNTRY_REQUEST" || fail 'Unable to list servers.' ;;
         *) fail "Unknown list request: $LIST_REQUEST" ;;
     esac
 }
@@ -397,9 +499,9 @@ choose_destination() {
   [2] Country           Country name or country code
   [3] City              Fastest server matching a city
   [4] Country + city    A city within a selected country
-  [5] Server            Exact hostname, such as uk715
+  [5] Server            Browse and select an exact hostname
   [6] Group             P2P, Double VPN, Onion, or Dedicated IP
-  [7] Advanced          Enter NordVPN connect arguments
+  [7] Raw connect args  Arguments placed after "nordvpn connect"
   [8] Exit
 EOF
         printf '\n'
@@ -429,7 +531,14 @@ EOF
                 CONNECT_TARGET=("$first" "$second")
                 return
                 ;;
-            5) first=$(prompt_required 'Server: '); CONNECT_TARGET=("$first"); return ;;
+            5)
+                read -r -p 'Optional country/code filter (Enter for any): ' first
+                show_servers "$first" || true
+                second=$(prompt_required 'Server hostname (for example, uk715): ')
+                second=${second%.nordvpn.com}
+                CONNECT_TARGET=("$second")
+                return
+                ;;
             6)
                 show_groups
                 first=$(prompt_required 'Group: ')
@@ -439,7 +548,21 @@ EOF
                 return
                 ;;
             7)
-                raw=$(prompt_required 'Arguments: ')
+                section 'NORDVPN CONNECT HELP'
+                nordvpn help connect 2>/dev/null || nordvpn help || true
+                cat <<'EOF'
+
+Enter only the part that normally follows "nordvpn connect".
+Examples:
+  uk715
+  united_kingdom london
+  --group p2p gb
+  --group double_vpn us
+
+Do not enter "nordvpn connect" itself.
+EOF
+                printf '\n'
+                raw=$(prompt_required 'Connect arguments: ')
                 read -r -a CONNECT_TARGET <<< "$raw"
                 return
                 ;;

@@ -24,7 +24,7 @@ On Ubuntu:
 
 ```bash
 sudo apt update
-sudo apt install wireguard-tools iproute2 curl
+sudo apt install wireguard-tools iproute2 curl jq
 sh <(curl -sSf https://downloads.nordcdn.com/apps/linux/install.sh)
 ```
 
@@ -49,6 +49,7 @@ connection, and export. It supports:
 - live country lists from `nordvpn countries`;
 - live country-specific city lists from `nordvpn cities COUNTRY`;
 - live specialty-group lists from `nordvpn groups`;
+- live recommended-server lists from NordVPN's server API;
 - countries, country codes, cities, and country/city combinations;
 - exact server names;
 - specialty groups such as P2P and Double VPN;
@@ -101,6 +102,8 @@ Positional destinations remain supported:
 | `--list-countries` | none | Print the current NordVPN country list and exit |
 | `--list-cities` | country | Print cities for one country and exit |
 | `--list-groups` | none | Print the current specialty-group list and exit |
+| `--list-servers` | none | Print recommended online NordLynx servers and exit |
+| `--limit` | 1–100 | Set the maximum number of server results; default is `25` |
 | `--no-color` | none | Disable terminal colours |
 | `--help`, `-h` | none | Show built-in help |
 | `--version`, `-v` | none | Show the NordConverter version |
@@ -115,6 +118,8 @@ reliable than a static list in this README:
 ./NordConverter.sh --list-countries
 ./NordConverter.sh --list-cities united_kingdom
 ./NordConverter.sh --list-groups
+./NordConverter.sh --list-servers
+./NordConverter.sh --list-servers --country united_kingdom --limit 20
 ```
 
 Equivalent native NordVPN commands are:
@@ -125,6 +130,25 @@ nordvpn cities united_kingdom
 nordvpn groups
 ```
 
+The NordVPN Linux CLI does not currently expose a native command that enumerates
+individual server hostnames. `--list-servers` therefore requests recommended
+online servers from NordVPN's `api.nordvpn.com/v1/servers/recommendations`
+endpoint and filters for NordLynx support. It displays:
+
+- hostname;
+- country;
+- city;
+- current reported load.
+
+Server listing requires `curl` and `jq`. The endpoint is operated by NordVPN but
+is separate from the Linux CLI and may change independently. NordConverter limits
+requests to at most 100 records and does not download the complete server
+catalogue.
+
+In the interactive menu, choose **Server** to display this list and then type the
+desired hostname. Both `uk715` and `uk715.nordvpn.com` are accepted; the suffix is
+removed before the hostname is passed to the NordVPN client.
+
 Common group values include `p2p`, `double_vpn`, `onion_over_vpn`, and
 `dedicated_ip`. Availability depends on the account, region, and installed
 NordVPN client.
@@ -133,6 +157,18 @@ NordVPN client.
 
 The interactive **Advanced** choice splits the entered text into arguments and
 passes them to `nordvpn connect` without evaluating them as shell commands.
+It displays `nordvpn help connect` first, so the available native arguments match
+the installed NordVPN client. Enter only the portion after `nordvpn connect`, not
+the command itself.
+
+Examples entered at the Option 7 prompt:
+
+```text
+uk715
+united_kingdom london
+--group p2p gb
+--group double_vpn us
+```
 
 For non-interactive raw arguments, place `--` before the native NordVPN
 connection arguments:
