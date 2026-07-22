@@ -65,7 +65,12 @@ instead of animation.
 If the NordVPN CLI is not authenticated, NordConverter offers:
 
 1. **Browser login** — complete the standard Nord Account flow.
-2. **Callback login** — paste the final link beginning with `nordvpn://`.
+2. **Callback login** — complete the login on NordVPN's website. On the final
+   success page, right-click the **Continue**, **Open NordVPN**, or trust/continue
+   button shown by Nord, choose **Copy link address**, then paste the complete
+   copied link into NordConverter. The link must begin with `nordvpn://`. If the
+   browser displays an **Open with NordVPN** prompt instead, cancel that prompt
+   first so you can copy the underlying Continue link.
 3. **Access token** — enter a token at a hidden prompt on a headless machine.
 
 Login values are submitted to the official NordVPN CLI and are not saved by
