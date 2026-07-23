@@ -2,6 +2,9 @@
 
 **Modified and maintained by Deano86**
 
+<img width="665" height="428" alt="image" src="https://github.com/user-attachments/assets/f6ee3e7b-7d9e-4d60-8f1d-44e44c35b975" />
+
+
 NordConverter creates an importable WireGuard configuration from a temporary
 NordLynx connection made by the official NordVPN Linux command-line client.
 
